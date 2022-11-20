@@ -7,12 +7,14 @@
     <title>Vite App</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <script defer src="https://unpkg.com/@alpinejs/persist@3.x.x/dist/cdn.min.js"></script>
     <script src="//unpkg.com/alpinejs" defer></script>
   </head>
   <body>
     <div
       class="
-        antialiased max-w-md mx-auto h-screen max-h-screen bg-gray-100
+        antialiased relative max-w-md mx-auto h-screen max-h-screen bg-gray-100
         flex flex-col
       "
     >
@@ -76,8 +78,13 @@
       <div
         class="mt-8 flex-1 flex overflow-hidden"
         x-data="{
+          editingId: null,
+          cartOpen: false,
+
           loading: true,
           categories: [],
+          foods: [],
+          carts: $persist([]),
           currentCategoryIndex: 0,
           clickCategory: function(index) {
             this.currentCategoryIndex = index
@@ -85,6 +92,31 @@
               block: 'start',
               behavior: 'smooth'
             })
+          },
+
+          updateCart: function (foodId, type) {
+            const findCartFood = this.carts.find((cartItem) => cartItem.id === foodId)
+
+            if (findCartFood) {
+              this.carts = this.carts
+                .map(cartItem => {
+                  if (cartItem.id !== foodId) {
+                    return cartItem
+                  }
+
+                  return {
+                    ...cartItem,
+                    quantity: cartItem.quantity + ((type === '+') ? 1 : -1)
+                  }
+                })
+                .filter((cartItem) => cartItem.quantity > 0)
+            } else if (type === '+') {
+              const findFood = this.foods.find((item) => item.id === foodId)
+              this.carts.push({
+                ...findFood,
+                quantity: 1,
+              })
+            }
           }
         }"
         x-init="
@@ -95,13 +127,17 @@
                 // console.log(data)
                 categories = data
 
+                foods = categories.reduce(function (res, currentCategory) {
+                  return [...res, ...currentCategory.foods]
+                }, [])
+
                 $nextTick(() => {
                   $refs['rightCategoryList'].querySelectorAll('.category-title').forEach((el, i) => {
                     // console.log(el)
 
                     const observer = new window.IntersectionObserver(([entry]) => {
                       if (entry.isIntersecting) {
-                        console.log('ENTER', el.innerHTML, i)
+                        // console.log('ENTER', el.innerHTML, i)
                         currentCategoryIndex = i
 
                         // console.log(Array.from($refs['leftCategoryList'].querySelectorAll('.category-item'))[currentCategoryIndex])
@@ -110,7 +146,7 @@
 
                         return
                       }
-                      console.log('LEAVE', i)
+                      // console.log('LEAVE', i)
 
                     }, {
                       root: null,
@@ -158,12 +194,77 @@
                         </div>
                         <div class="w-2/3">
                           <div x-text="food.name"></div>
+                          <div class="flex justify-between items-center text-sm">
+                            <div class="text-[#E2554E] font-medium"><span>MOP</span><span class="text-xl font-semibold" x-text="food.price / 100"></span></div>
+
+                            <button
+                              type="button"
+                              class="bg-[#E97434] text-white p-1 rounded-md font-medium"
+                              @click="editingId = food.id"
+                            >
+                              選規格
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </template>
                   </div>
                 </div>
               </template>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="editingId">
+          <div class="fixed inset-0 flex items-center justify-center px-4">
+            <div class="absolute inset-0 bg-black/50" @click="editingId = null"></div>
+            <div class="relative max-w-sm bg-white w-full rounded-lg">
+              <div
+                x-text="foods.find((item) => item.id === editingId).name"
+                class="py-2 px-4 text-lg font-semibold"
+              ></div>
+
+              <div class="h-40 p-4">
+                ...todo
+              </div>
+
+              <div class="h-24 p-4 flex justify-between items-center">
+                <div>小計 MOP <span x-text="foods.find((item) => item.id === editingId).price / 100"></span> /份</div>
+
+                <div class="flex items-center space-x-2">
+                  <button type="button" @click="updateCart(editingId, '-')">-</button>
+                  <span x-text="carts.find((cartItem) => cartItem.id === editingId)?.quantity || '0'">
+                  </span>
+                  <button type="button" @click="updateCart(editingId, '+')">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!loading">
+          <div class="absolute bottom-4 w-full px-4">
+            <div class="h-24 bg-[#302E49] rounded-lg" @click="cartOpen = !cartOpen">
+
+            </div>
+
+            <div x-show="cartOpen" x-transition class="absolute bottom-0 left-0 w-full mb-28 px-4">
+              <div class="h-40 bg-white rounded-lg drop-shadow-lg overflow-auto">
+                <template x-for="cartItem in carts" :key="cartItem.id">
+                  <div class="p-4">
+                    <div x-text="cartItem.name"></div>
+
+                    <div class="flex justify-between">
+                      <div x-text="cartItem.price"></div>
+                      <div class="flex items-center space-x-2">
+                        <button type="button" @click="updateCart(cartItem.id, '-')">-</button>
+                        <span x-text="cartItem.quantity"></span>
+                        <button type="button" @click="updateCart(cartItem.id, '+')">+</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </template>
